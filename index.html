@@ -57,8 +57,12 @@
             display: table-cell;
             width: 16%;
             vertical-align: top;
-            background-color: #000000;
+            /* background-color: #000000; */
             padding: 20px 15px;
+            background-image: url(assets/bg-sidebar.png);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
         /* Decorative corner element mimicking image flare gradient */
@@ -98,7 +102,10 @@
         .ticker-row {
             display: table-row;
             height: 12vh;
-            background-color: #000000;
+            /* background-color: #731311; */
+            background-image: url(assets/bg-sidebar2.png);
+            background-size: contain;
+            background-position: left;
         }
 
         .ticker-container-cell {
@@ -166,7 +173,6 @@
             width: 70px;
             vertical-align: middle;
             text-align: center;
-            padding-right: 15px;
             background-color: #000000;
         }
 
@@ -222,7 +228,7 @@
 
             <!-- Left Match Schedule Side panel -->
             <div class="sidebar-cell">
-                <div class="sidebar-header-wrapper">
+                <div class="sidebar-header-wrapper" style="padding-bottom: 20%">
                     <img src="/assets/logo-white.png" class="img-fluid" style="width:30%" alt="logo">
                 </div>
 
@@ -321,52 +327,96 @@
         <div class="ticker-row">
             <div class="ticker-container-cell">
                 <div class="ticker-flex-layout">
-                    <div class="ticker-label">Live Score</div>
+                    <div></div>
+                    <div class="d-flex justify-content-end ticker-label">Live Score</div>
                     
                 </div>
             </div>
 
             <!-- Bottom Right Event Logo Bracket -->
             <div class="bottom-right-logo-cell">
-                <div class="d-flex bd-highlight">
-                    <div class="p-2 w-100 bd-highlight">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="card">
-                                    <span class="text-dark arial">
-                                        text
-                                    </span>
+
+                <div class="d-flex bd-highlight mb-3">
+                    
+                    <!-- liveScore1 -->
+                    <div class="p-2 bd-highlight">
+                        <div class="card">
+                            <div class="d-flex bd-highlight">
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/mexico.png" alt="flag">
+                                    <span class="text-dark inter">Mexico</span>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card">
-                                    <span class="text-dark arial">
-                                        text
-                                    </span>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter fw-bold">1 V 1</span>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card">
-                                    <span class="text-dark arial">
-                                        text
-                                    </span>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/southafrica.png" alt="flag">
+                                    <span class="text-dark inter">S. Africa</span>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card">
-                                    <span class="text-dark arial">
-                                        text
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter">
+                                        <b>Group Stage</b>
+                                        | Fri, 12 Jun, 3:00am
                                     </span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="flex-shrink-1 bd-highlight">
-                        <img src="/assets/logofooter-white.png" class="img-fluid" style="width:15%" alt="footer-logo">
-                    </div>
-                </div>
 
-                
+                    <!-- liveScore2 -->
+                    <div class="p-2 bd-highlight">
+                        <div class="card">
+                            <div class="d-flex bd-highlight">
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/mexico.png" alt="flag">
+                                    <span class="text-dark inter">Mexico</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter fw-bold">1 V 1</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/southafrica.png" alt="flag">
+                                    <span class="text-dark inter">S. Africa</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter">
+                                        <b>Group Stage</b>
+                                        | Fri, 12 Jun, 3:00am
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- liveScore3 -->
+                    <div class="p-2 bd-highlight">
+                        <div class="card">
+                            <div class="d-flex bd-highlight">
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/mexico.png" alt="flag">
+                                    <span class="text-dark inter">Mexico</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter fw-bold">1 V 1</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <img src="assets/flag/southafrica.png" alt="flag">
+                                    <span class="text-dark inter">S. Africa</span>
+                                </div>
+                                <div class="p-2 flex-fill bd-highlight">
+                                    <span class="text-dark inter">
+                                        <b>Group Stage</b>
+                                        | Fri, 12 Jun, 3:00am
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- <div class="ms-auto p-2 bd-highlight" style="width: 20%;">
+                        <img src="/assets/logofooter-white.png" style="width:15%" alt="footer-logo">
+                    </div> -->
+                </div>
 
             </div>
         </div>
