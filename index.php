@@ -1,3 +1,8 @@
+<?php
+// Read the live configuration file written by the dashboard panel
+$config_file = 'active_slide.txt';
+$live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) : '10.png';
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -5,10 +10,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TV Multipurpose Information Board</title>
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <style>
@@ -30,11 +33,9 @@
             background-color: #000;
             color: #fff;
             overflow: hidden;
-            /* Applied custom font globally */
             font-family: 'FWC2026-NormalRegular', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
-        /* Force font rendering override on inputs/headings if necessary */
         h1, h2, h3, h4, h5, h6, span, div, p {
             font-family: 'FWC2026-NormalRegular', sans-serif;
         }
@@ -57,7 +58,6 @@
             display: table-cell;
             width: 16%;
             vertical-align: top;
-            /* background-color: #000000; */
             padding: 20px 15px;
             background-image: url(assets/bg-sidebar.png);
             background-size: cover;
@@ -65,7 +65,6 @@
             background-repeat: no-repeat;
         }
 
-        /* Decorative corner element mimicking image flare gradient */
         .sidebar-header-wrapper {
             position: relative;
             text-align: center;
@@ -79,30 +78,26 @@
             z-index: 2;
         }
         
-
         /* Carousel Content Cell */
         .carousel-cell {
             display: table-cell;
             width: 84%;
-            background-color: #d2d2d2;
             color: #1a1a1a;
             vertical-align: middle;
             text-align: center;
             position: relative;
-        }
-
-        .carousel-placeholder-text {
-            font-size: 4.5rem;
-            font-weight: 700;
-            letter-spacing: -1px;
-            color: #111111;
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            box-shadow: 
+            inset 4px 4px 30px rgba(0, 0, 0, 0.5), 
+            inset -4px -4px 30px rgba(0, 0, 0, 0.5);
         }
 
         /* Bottom Live Score Ticker Layout */
         .ticker-row {
             display: table-row;
             height: 12vh;
-            /* background-color: #731311; */
             background-image: url(assets/bg-sidebar2.png);
             background-size: contain;
             background-position: left;
@@ -181,41 +176,13 @@
             width: auto;
         }
 
-        .inter{
-            font-family: inter;
-        }
-
-        .red{
-            background-color: #D40101;
-            border-radius: 10px;
-        }
-
-        .dark-red{
-            background-color: #731311;
-            border-radius: 10px;
-        }
-
-        .green{
-            background-color: #00C953;
-            border-radius: 10px;
-        }
-
-        .dark-green{
-            background-color: #004E3C;
-            border-radius: 10px;
-        }
-
-        
-
-        .card{
-            border: none;
-        }
-
-    
-        .card-header:first-child{
-            border-radius: 9px 9px 0 0;
-        }
-
+        .inter{ font-family: inter; }
+        .red{ background-color: #D40101; border-radius: 10px; }
+        .dark-red{ background-color: #731311; border-radius: 10px; }
+        .green{ background-color: #00C953; border-radius: 10px; }
+        .dark-green{ background-color: #004E3C; border-radius: 10px; }
+        .card{ border: none; }
+        .card-header:first-child{ border-radius: 9px 9px 0 0; }
     </style>
 </head>
 
@@ -223,122 +190,94 @@
 
     <div class="tv-container">
 
-        <!-- Upper Split Dashboard Frame -->
         <div class="main-content-row">
 
-            <!-- Left Match Schedule Side panel -->
             <div class="sidebar-cell">
                 <div class="sidebar-header-wrapper" style="padding-bottom: 20%">
-                    <img src="/assets/logo-white.png" class="img-fluid" style="width:30%" alt="logo">
+                    <a href="dashboard.php">
+                        <img src="/assets/logo-white.png" class="img-fluid" style="width:30%" alt="logo">
+                    </a>
                 </div>
 
                 <h5 class="text-white mt-5">World Cup Matches</h5>
                 
-                    <div class="card mb-3" style="border-radius: 10px;">
-                        <div class="card-header text-white inter fw-bold dark-red">
-                            Group Stage
-                        </div>
-                        <div class="card-body text-dark">
-                            <div class="row">
-                                <div class="col-md-7">
-                                    <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                    <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
-                                </div>
-                                <div class="col-md-5">
-                                    <span class="inter">
-                                        Fri, 12 Jun
-                                        3:00am
-                                    </span>
-                                </div>
+                <div class="card mb-3" style="border-radius: 10px;">
+                    <div class="card-header text-white inter fw-bold dark-red">Group Stage</div>
+                    <div class="card-body text-dark">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
+                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                            </div>
+                            <div class="col-md-5">
+                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="card mb-3" style="border-radius: 10px;">
-                        <div class="card-header text-white inter fw-bold red">
-                            Group Stage
-                        </div>
-                        <div class="card-body text-dark">
-                            <div class="row">
-                                <div class="col-md-7">
-                                    <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                    <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
-                                </div>
-                                <div class="col-md-5">
-                                    <span class="inter">
-                                        Fri, 12 Jun
-                                        3:00am
-                                    </span>
-                                </div>
+                <div class="card mb-3" style="border-radius: 10px;">
+                    <div class="card-header text-white inter fw-bold red">Group Stage</div>
+                    <div class="card-body text-dark">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
+                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                            </div>
+                            <div class="col-md-5">
+                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="card mb-3" style="border-radius: 10px;">
-                        <div class="card-header text-white inter fw-bold green">
-                            Group Stage
-                        </div>
-                        <div class="card-body text-dark">
-                            <div class="row">
-                                <div class="col-md-7">
-                                    <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                    <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
-                                </div>
-                                <div class="col-md-5">
-                                    <span class="inter">
-                                        Fri, 12 Jun
-                                        3:00am
-                                    </span>
-                                </div>
+                <div class="card mb-3" style="border-radius: 10px;">
+                    <div class="card-header text-white inter fw-bold green">Group Stage</div>
+                    <div class="card-body text-dark">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
+                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                            </div>
+                            <div class="col-md-5">
+                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="card mb-3" style="border-radius: 10px;">
-                        <div class="card-header text-white inter fw-bold dark-green">
-                            Group Stage
-                        </div>
-                        <div class="card-body text-dark">
-                            <div class="row">
-                                <div class="col-md-7">
-                                    <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                    <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
-                                </div>
-                                <div class="col-md-5">
-                                    <span class="inter">
-                                        Fri, 12 Jun
-                                        3:00am
-                                    </span>
-                                </div>
+                <div class="card mb-3" style="border-radius: 10px;">
+                    <div class="card-header text-white inter fw-bold dark-green">Group Stage</div>
+                    <div class="card-body text-dark">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
+                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                            </div>
+                            <div class="col-md-5">
+                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
-
+                </div>
             </div>
 
-            <!-- Main Display / Media Showcase Center Section -->
-            <div class="carousel-cell">
-                <div class="carousel-placeholder-text">Carousel</div>
+            <div class="carousel-cell" style="background-image: url('assets/slide/<?php echo htmlspecialchars($live_image); ?>');">
             </div>
 
         </div>
 
-        <!-- Lower Live Info Banner Ticker Pane -->
         <div class="ticker-row">
             <div class="ticker-container-cell">
                 <div class="ticker-flex-layout">
                     <div></div>
-                    <div class="d-flex justify-content-end ticker-label">Live Score</div>
-                    
+                    <div class="d-flex justify-content-end ticker-label">Live Score :</div>
                 </div>
             </div>
 
-            <!-- Bottom Right Event Logo Bracket -->
             <div class="bottom-right-logo-cell">
-
                 <div class="d-flex bd-highlight mb-3">
                     
-                    <!-- liveScore1 -->
                     <div class="p-2 bd-highlight">
                         <div class="card">
                             <div class="d-flex bd-highlight">
@@ -354,16 +293,12 @@
                                     <span class="text-dark inter">S. Africa</span>
                                 </div>
                                 <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter">
-                                        <b>Group Stage</b>
-                                        | Fri, 12 Jun, 3:00am
-                                    </span>
+                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- liveScore2 -->
                     <div class="p-2 bd-highlight">
                         <div class="card">
                             <div class="d-flex bd-highlight">
@@ -379,16 +314,12 @@
                                     <span class="text-dark inter">S. Africa</span>
                                 </div>
                                 <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter">
-                                        <b>Group Stage</b>
-                                        | Fri, 12 Jun, 3:00am
-                                    </span>
+                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- liveScore3 -->
                     <div class="p-2 bd-highlight">
                         <div class="card">
                             <div class="d-flex bd-highlight">
@@ -404,29 +335,34 @@
                                     <span class="text-dark inter">S. Africa</span>
                                 </div>
                                 <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter">
-                                        <b>Group Stage</b>
-                                        | Fri, 12 Jun, 3:00am
-                                    </span>
+                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- <div class="ms-auto p-2 bd-highlight" style="width: 20%;">
-                        <img src="/assets/logofooter-white.png" style="width:15%" alt="footer-logo">
-                    </div> -->
                 </div>
-
             </div>
         </div>
 
     </div>
 
-    <!-- Bootstrap 5 Bundle with Popper JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
         crossorigin="anonymous"></script>
+        
+    <script>
+        setInterval(() => {
+            fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newBg = doc.querySelector('.carousel-cell').style.backgroundImage;
+                document.querySelector('.carousel-cell').style.backgroundImage = newBg;
+            });
+        }, 3000); // Polls system updates safely every 3 seconds
+    </script>
 </body>
 
 </html>
