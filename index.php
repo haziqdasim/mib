@@ -22,6 +22,14 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             font-style: normal;
         }
 
+        /* Registered your new Inter TTF font profile here */
+        @font-face {
+            font-family: 'Inter-Custom';
+            src: url('/assets/fonts/Inter_18pt-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         *, *::before, *::after {
             box-sizing: border-box;
         }
@@ -38,6 +46,11 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
 
         h1, h2, h3, h4, h5, h6, span, div, p {
             font-family: 'FWC2026-NormalRegular', sans-serif;
+        }
+
+        /* Explicitly forced the .inter class selection rule to render with the new local file font asset */
+        .inter { 
+            font-family: 'Inter-Custom', sans-serif !important; 
         }
 
         /* Layout Framework Layout */
@@ -176,7 +189,6 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             width: auto;
         }
 
-        .inter{ font-family: inter; }
         .red{ background-color: #D40101; border-radius: 10px; }
         .dark-red{ background-color: #731311; border-radius: 10px; }
         .green{ background-color: #00C953; border-radius: 10px; }
