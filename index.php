@@ -1,15 +1,12 @@
 <?php
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
-// 1. Read the live configuration file written by the dashboard panel
 $config_file = 'active_slide.txt';
 $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) : '10.png';
 
-// 2. Fetch Live World Cup Data — no cache
 $games_url = 'https://worldcup26.ir/get/games';
 $stadiums_url = 'https://worldcup26.ir/get/stadiums';
 
-// City-to-timezone mapping for all 2026 WC host cities
 $city_timezone_map = [
     'Mexico City'      => 'America/Mexico_City',
     'Guadalajara'      => 'America/Mexico_City',
@@ -29,7 +26,6 @@ $city_timezone_map = [
     'Los Angeles'      => 'America/Los_Angeles',
 ];
 
-// Helper: fetch JSON from URL
 function fetch_json($url) {
     $ch = curl_init();
     curl_setopt_array($ch, [
@@ -45,9 +41,9 @@ function fetch_json($url) {
     return ($http_code === 200 && $result) ? json_decode($result, true) : null;
 }
 
-// --- Fetch stadiums and build timezone map ---
+// --- Stadiums ---
 $stadium_timezones = [];
-$stadium_info = []; // stadium_id => [name, city, country]
+$stadium_info = [];
 
 $stadium_data = fetch_json($stadiums_url);
 if ($stadium_data && isset($stadium_data['stadiums'])) {
@@ -55,37 +51,19 @@ if ($stadium_data && isset($stadium_data['stadiums'])) {
         $sid = $s['id'];
         $city = $s['city_en'];
         $region = $s['region'] ?? '';
-
-        $stadium_info[$sid] = [
-            'name'    => $s['name_en'],
-            'city'    => $city,
-            'country' => $s['country_en'],
-        ];
-
-        // Resolve timezone from city
+        $stadium_info[$sid] = ['name' => $s['name_en'], 'city' => $city, 'country' => $s['country_en']];
         $tz = null;
-        if (isset($city_timezone_map[$city])) {
-            $tz = $city_timezone_map[$city];
-        } else {
-            foreach ($city_timezone_map as $city_key => $tz_val) {
-                if (stripos($city, $city_key) !== false) { $tz = $tz_val; break; }
-            }
-        }
-        if (!$tz) {
-            $tz = match ($region) {
-                'Eastern' => 'America/New_York',
-                'Central' => 'America/Chicago',
-                'Western' => 'America/Los_Angeles',
-                default   => 'America/New_York',
-            };
-        }
+        if (isset($city_timezone_map[$city])) { $tz = $city_timezone_map[$city]; }
+        else { foreach ($city_timezone_map as $ck => $tv) { if (stripos($city, $ck) !== false) { $tz = $tv; break; } } }
+        if (!$tz) { $tz = match ($region) { 'Eastern'=>'America/New_York', 'Central'=>'America/Chicago', 'Western'=>'America/Los_Angeles', default=>'America/New_York' }; }
         $stadium_timezones[$sid] = $tz;
     }
 }
 
-// --- Fetch games ---
+// --- Games ---
 $data = fetch_json($games_url);
 $upcoming_matches = [];
+$live_scores = [];
 $games_list = $data['games'] ?? (is_array($data) ? $data : []);
 
 if (!empty($games_list)) {
@@ -95,19 +73,23 @@ if (!empty($games_list)) {
     foreach ($games_list as $game) {
         if (empty($game['home_team_name_en'])) continue;
 
-        $date_str    = $game['local_date'];
-        $stadium_id  = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
-        $tz_name     = $stadium_timezones[$stadium_id] ?? 'America/New_York';
-        $date        = DateTime::createFromFormat('m/d/Y H:i', $date_str, new DateTimeZone($tz_name));
+        $date_str   = $game['local_date'];
+        $stadium_id = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
+        $tz_name    = $stadium_timezones[$stadium_id] ?? 'America/New_York';
+        $date       = DateTime::createFromFormat('m/d/Y H:i', $date_str, new DateTimeZone($tz_name));
 
+        $formatted = $date_str;
+        $ts = $current_ts;
         if ($date) {
             $date->setTimezone($malaysia_tz);
             $formatted = $date->format('D, j M') . '<br>' . $date->format('g:ia') . ' <span class="tz-badge">MYT</span>';
             $ts = $date->getTimestamp();
-        } else {
-            $formatted = $date_str;
-            $ts = $current_ts;
         }
+
+        $finished   = $game['finished'] ?? 'FALSE';
+        $elapsed    = $game['time_elapsed'] ?? 'notstarted';
+        $h_score    = $game['home_score'] ?? '0';
+        $a_score    = $game['away_score'] ?? '0';
 
         $loc = '';
         if (isset($stadium_info[$stadium_id])) {
@@ -115,19 +97,41 @@ if (!empty($games_list)) {
             $loc = htmlspecialchars($s['city']) . ', ' . htmlspecialchars($s['country']);
         }
 
-        $upcoming_matches[] = [
-            'stage'     => (!empty($game['group']) ? 'Group ' . $game['group'] : 'Match Stage'),
-            'home_team' => $game['home_team_name_en'],
-            'away_team' => $game['away_team_name_en'],
-            'schedule'  => $formatted,
-            'timestamp' => $ts,
-            'stadium'   => $loc,
+        $entry = [
+            'stage'       => (!empty($game['group']) ? 'Group ' . $game['group'] : 'Match Stage'),
+            'home_team'   => $game['home_team_name_en'],
+            'away_team'   => $game['away_team_name_en'],
+            'schedule'    => $formatted,
+            'timestamp'   => $ts,
+            'stadium'     => $loc,
+            'home_score'  => $h_score,
+            'away_score'  => $a_score,
+            'finished'    => $finished,
+            'time_elapsed'=> $elapsed,
         ];
+
+        // Live scores: in-progress or finished games
+        if ($elapsed !== 'notstarted' || $finished === 'TRUE') {
+            $live_scores[] = $entry;
+        }
+
+        // Upcoming sidebar: future games
+        if ($elapsed === 'notstarted' && $finished === 'FALSE') {
+            $upcoming_matches[] = $entry;
+        }
     }
 
     usort($upcoming_matches, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
     $upcoming_matches = array_values(array_filter($upcoming_matches, fn($m) => $m['timestamp'] >= ($current_ts - 9000)));
     $upcoming_matches = array_slice($upcoming_matches, 0, 4);
+
+    // Sort live: in-progress first, then finished by timestamp desc
+    usort($live_scores, function($a, $b) {
+        $aLive = $a['finished'] === 'TRUE' ? 1 : 0;
+        $bLive = $b['finished'] === 'TRUE' ? 1 : 0;
+        if ($aLive !== $bLive) return $aLive - $bLive;
+        return $b['timestamp'] - $a['timestamp'];
+    });
 }
 
 $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
@@ -144,54 +148,24 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <style>
-        @font-face {
-            font-family: 'FWC2026-NormalRegular';
-            src: url('/fonts/FWC2026-NormalRegular.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Inter-Custom';
-            src: url('/assets/fonts/Inter_18pt-Regular.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
+        @font-face { font-family: 'FWC2026-NormalRegular'; src: url('/fonts/FWC2026-NormalRegular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
+        @font-face { font-family: 'Inter-Custom'; src: url('/assets/fonts/Inter_18pt-Regular.ttf') format('truetype'); font-weight: normal; font-style: normal; }
         *, *::before, *::after { box-sizing: border-box; }
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            background-color: #000; color: #fff; overflow: hidden;
-            font-family: 'FWC2026-NormalRegular', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; background-color: #000; color: #fff; overflow: hidden; font-family: 'FWC2026-NormalRegular', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
         h1, h2, h3, h4, h5, h6, span, div, p { font-family: 'FWC2026-NormalRegular', sans-serif; }
         .inter { font-family: 'Inter-Custom', sans-serif !important; }
 
         .tv-container { height: 100vh; display: table; width: 100%; table-layout: fixed; }
         .main-content-row { display: table-row; height: 88vh; }
-        .sidebar-cell {
-            display: table-cell; width: 16%; vertical-align: top;
-            padding: 20px 15px;
-            background-image: url(assets/bg-sidebar.png);
-            background-size: cover; background-position: center; background-repeat: no-repeat;
-        }
+        .sidebar-cell { display: table-cell; width: 16%; vertical-align: top; padding: 20px 15px; background-image: url(assets/bg-sidebar.png); background-size: cover; background-position: center; background-repeat: no-repeat; }
         .sidebar-header-wrapper { position: relative; text-align: center; margin-bottom: 25px; }
-        .carousel-cell {
-            display: table-cell; width: 84%; color: #1a1a1a;
-            vertical-align: middle; text-align: center; position: relative;
-            background-position: center; background-size: cover; background-repeat: no-repeat;
-            box-shadow: inset 4px 4px 30px rgba(0,0,0,0.1), inset -4px -4px 30px rgba(0,0,0,0.1);
-        }
-        .ticker-row {
-            display: table-row; height: 12vh;
-            background-image: url(assets/bg-sidebar2.png);
-            background-repeat: no-repeat; background-size: contain; background-position: left;
-        }
+        .carousel-cell { display: table-cell; width: 84%; color: #1a1a1a; vertical-align: middle; text-align: center; position: relative; background-position: center; background-size: cover; background-repeat: no-repeat; box-shadow: inset 4px 4px 30px rgba(0,0,0,0.1), inset -4px -4px 30px rgba(0,0,0,0.1); }
+        .ticker-row { display: table-row; height: 12vh; background-image: url(assets/bg-sidebar2.png); background-repeat: no-repeat; background-size: contain; background-position: left; }
         .ticker-container-cell { display: table-cell; vertical-align: middle; padding: 0 15px; }
-        .ticker-flex-layout { display: flex; align-items: center; justify-content: space-between; height: 100%; }
-        .ticker-label {
-            font-weight: 700; font-size: 1.15rem; text-transform: uppercase;
-            letter-spacing: 0.5px; white-space: nowrap; padding-right: 20px; color: #fff;
-        }
+        .ticker-flex-layout { display: flex; align-items: center; justify-content: flex-start; height: 100%; gap: 20px; }
+        .ticker-label { font-weight: 700; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; color: #fff; flex-shrink: 0; }
         .bottom-right-logo-cell { display: table-cell; width: 70px; vertical-align: middle; text-align: center; background-color: #000; }
+
         .red{ background-color: #D40101; border-radius: 10px; }
         .dark-red{ background-color: #731311; border-radius: 10px; }
         .green{ background-color: #00C953; border-radius: 10px; }
@@ -199,15 +173,19 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .card{ border: none; }
         .card-header:first-child{ border-radius: 9px 9px 0 0; }
 
-        .tz-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 3px; padding: 0 4px;
-            font-size: 0.65rem; font-weight: 600; letter-spacing: 0.3px;
-            vertical-align: middle; line-height: 1.3;
-        }
+        .tz-badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 3px; padding: 0 4px; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.3px; vertical-align: middle; line-height: 1.3; }
         .stadium-location { font-size: 0.65rem; color: #6c757d; display: block; margin-top: 2px; line-height: 1.2; }
+
+        /* Ticker score items */
+        .score-item { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 1rem; font-weight: 700; color: #fff; padding: 4px 14px; border-right: 1px solid rgba(255,255,255,0.15); }
+        .score-item:last-child { border-right: none; }
+        .score-vs { color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0 2px; }
+        .score-num { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 7px; font-family: 'Inter-Custom', monospace; font-size: 1.1rem; min-width: 24px; text-align: center; }
+        .score-badge-live { background: #D40101; color: #fff; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
+        .score-badge-ft { background: #333; color: #aaa; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; }
+        .ticker-scores-wrap { overflow: hidden; flex: 1; }
+        .ticker-scores-inner { display: flex; align-items: center; gap: 0; }
+        .no-scores { color: rgba(255,255,255,0.4); font-size: 0.9rem; font-style: italic; }
     </style>
 </head>
 
@@ -228,26 +206,16 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
                 <?php foreach ($upcoming_matches as $i => $m): ?>
                     <?php $style = $card_styles[$i % count($card_styles)]; ?>
                     <div class="card mb-3" style="border-radius: 10px;">
-                        <div class="card-header text-white inter fw-bold <?= $style ?>">
-                            <?= htmlspecialchars($m['stage']) ?>
-                        </div>
+                        <div class="card-header text-white inter fw-bold <?= $style ?>"><?= htmlspecialchars($m['stage']) ?></div>
                         <div class="card-body text-dark" style="padding:10px 12px; background:#fff; border-radius:0 0 10px 10px;">
                             <div class="row g-0 align-items-center">
                                 <div class="col-md-7" style="max-width:62%;">
-                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
-                                        <?= htmlspecialchars($m['home_team']) ?>
-                                    </span>
-                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
-                                        <?= htmlspecialchars($m['away_team']) ?>
-                                    </span>
-                                    <?php if (!empty($m['stadium'])): ?>
-                                        <span class="stadium-location inter"><i class="bi bi-geo-alt"></i> <?= $m['stadium'] ?></span>
-                                    <?php endif; ?>
+                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;"><?= htmlspecialchars($m['home_team']) ?></span>
+                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;"><?= htmlspecialchars($m['away_team']) ?></span>
+                                    <?php if (!empty($m['stadium'])): ?><span class="stadium-location inter"><i class="bi bi-geo-alt"></i> <?= $m['stadium'] ?></span><?php endif; ?>
                                 </div>
                                 <div class="col-md-5 text-end" style="max-width:38%;">
-                                    <span class="inter text-secondary fw-bold" style="line-height:1.2; display:block; font-size:0.78rem;">
-                                        <?= $m['schedule'] ?>
-                                    </span>
+                                    <span class="inter text-secondary fw-bold" style="line-height:1.2; display:block; font-size:0.78rem;"><?= $m['schedule'] ?></span>
                                 </div>
                             </div>
                         </div>
@@ -258,15 +226,36 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
             <?php endif; ?>
         </div>
 
-        <div class="carousel-cell" style="background-image: url('assets/slide/<?= htmlspecialchars($live_image) ?>');">
-        </div>
+        <div class="carousel-cell" style="background-image: url('assets/slide/<?= htmlspecialchars($live_image) ?>');"></div>
     </div>
 
     <div class="ticker-row">
         <div class="ticker-container-cell">
             <div class="ticker-flex-layout">
-                <div></div>
-                <div class="d-flex justify-content-end ticker-label">Live Score :</div>
+                <div class="ticker-label">Live Score :</div>
+                <div class="ticker-scores-wrap">
+                    <div class="ticker-scores-inner" id="scoreTicker">
+                        <?php if (!empty($live_scores)): ?>
+                            <?php foreach ($live_scores as $s): ?>
+                                <?php
+                                    $badge = $s['finished'] === 'TRUE'
+                                        ? '<span class="score-badge-ft">FT</span>'
+                                        : '<span class="score-badge-live">LIVE</span>';
+                                ?>
+                                <div class="score-item">
+                                    <?= $badge ?>
+                                    <span><?= htmlspecialchars($s['home_team']) ?></span>
+                                    <span class="score-num"><?= htmlspecialchars($s['home_score']) ?></span>
+                                    <span class="score-vs">:</span>
+                                    <span class="score-num"><?= htmlspecialchars($s['away_score']) ?></span>
+                                    <span><?= htmlspecialchars($s['away_team']) ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <span class="no-scores">No live matches — check back during the tournament</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="bottom-right-logo-cell">
@@ -287,6 +276,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
     integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
     crossorigin="anonymous"></script>
 <script>
+// Carousel slide poll
 setInterval(() => {
     fetch(window.location.href)
     .then(r => r.text())
@@ -295,8 +285,37 @@ setInterval(() => {
         const newBg = doc.querySelector('.carousel-cell').style.backgroundImage;
         const el = document.querySelector('.carousel-cell');
         if (el.style.backgroundImage !== newBg) el.style.backgroundImage = newBg;
-    }).catch(e => console.warn("Polling failed:", e));
+    }).catch(e => console.warn("Slide poll:", e));
 }, 4000);
+
+// Score ticker poll — updates every 30s
+function renderScoreItem(s) {
+    const badge = s.finished === 'TRUE'
+        ? '<span class="score-badge-ft">FT</span>'
+        : '<span class="score-badge-live">LIVE</span>';
+    return '<div class="score-item">'
+        + badge
+        + '<span>' + s.home_team + '</span>'
+        + '<span class="score-num">' + s.home_score + '</span>'
+        + '<span class="score-vs">:</span>'
+        + '<span class="score-num">' + s.away_score + '</span>'
+        + '<span>' + s.away_team + '</span>'
+        + '</div>';
+}
+
+setInterval(() => {
+    fetch('api_games.php')
+    .then(r => r.json())
+    .then(data => {
+        const scores = data.scores || [];
+        const cont = document.getElementById('scoreTicker');
+        if (scores.length === 0) {
+            cont.innerHTML = '<span class="no-scores">No live matches — check back during the tournament</span>';
+        } else {
+            cont.innerHTML = scores.map(renderScoreItem).join('');
+        }
+    }).catch(e => console.warn("Score poll:", e));
+}, 30000);
 </script>
 </body>
 </html>
