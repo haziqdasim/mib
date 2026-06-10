@@ -164,7 +164,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .ticker-container-cell { display: table-cell; vertical-align: middle; padding: 0 15px; }
         .ticker-flex-layout { display: flex; align-items: center; justify-content: flex-start; height: 100%; gap: 20px; }
         .ticker-label { font-weight: 700; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; color: #fff; flex-shrink: 0; }
-        .bottom-right-logo-cell { display: table-cell; width: 70px; vertical-align: middle; text-align: center; background-color: #000; }
+        .bottom-right-logo-cell { display: table-cell; width: 110px; vertical-align: middle; text-align: center; background-color: #000; }
 
         .red{ background-color: #D40101; border-radius: 10px; }
         .dark-red{ background-color: #731311; border-radius: 10px; }
@@ -181,6 +181,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .score-item:last-child { border-right: none; }
         .score-vs { color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0 2px; }
         .score-num { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 7px; font-family: 'Inter-Custom', monospace; font-size: 1.1rem; min-width: 24px; text-align: center; }
+        .score-big { font-size: 1.6rem; font-weight: 900; padding: 2px 10px; background: transparent; }
         .score-badge-live { background: #D40101; color: #fff; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
         .score-badge-ft { background: #333; color: #aaa; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; }
         .ticker-scores-wrap { overflow: hidden; flex: 1; }
@@ -233,40 +234,39 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         <div class="ticker-container-cell">
             <div class="ticker-flex-layout">
                 <div class="ticker-label">Live Score :</div>
-                <div class="ticker-scores-wrap">
-                    <div class="ticker-scores-inner" id="scoreTicker">
-                        <?php if (!empty($live_scores)): ?>
-                            <?php foreach ($live_scores as $s): ?>
-                                <?php
-                                    $badge = $s['finished'] === 'TRUE'
-                                        ? '<span class="score-badge-ft">FT</span>'
-                                        : '<span class="score-badge-live">LIVE</span>';
-                                ?>
-                                <div class="score-item">
-                                    <?= $badge ?>
-                                    <span><?= htmlspecialchars($s['home_team']) ?></span>
-                                    <span class="score-num"><?= htmlspecialchars($s['home_score']) ?></span>
-                                    <span class="score-vs">:</span>
-                                    <span class="score-num"><?= htmlspecialchars($s['away_score']) ?></span>
-                                    <span><?= htmlspecialchars($s['away_team']) ?></span>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <span class="no-scores">No live matches — check back during the tournament</span>
-                        <?php endif; ?>
-                    </div>
+                <div id="scoreTicker" class="ticker-scores-inner">
+                    <?php if (!empty($live_scores)): ?>
+                        <?php foreach ($live_scores as $s): ?>
+                            <?php
+                                $badge = $s['finished'] === 'TRUE'
+                                    ? '<span class="score-badge-ft">FT</span>'
+                                    : '<span class="score-badge-live">LIVE</span>';
+                            ?>
+                            <div class="score-item">
+                                <?= $badge ?>
+                                <span><?= htmlspecialchars($s['home_team']) ?></span>
+                                <span class="score-num"><?= htmlspecialchars($s['home_score']) ?></span>
+                                <span class="score-vs">:</span>
+                                <span class="score-num"><?= htmlspecialchars($s['away_score']) ?></span>
+                                <span><?= htmlspecialchars($s['away_team']) ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
         <div class="bottom-right-logo-cell">
-            <div class="d-flex bd-highlight mb-3">
-                <div class="p-2 bd-highlight">
-                    <div class="card">
-                        <div class="d-flex bd-highlight">
-                            <span class="text-dark px-2 py-2">Coming Soon</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="score-item" id="scoreBanner">
+                <?php if (!empty($live_scores)): ?>
+                    <?php $s = $live_scores[0]; ?>
+                    <span class="score-num score-big"><?= htmlspecialchars($s['home_score']) ?></span>
+                    <span class="score-vs">-</span>
+                    <span class="score-num score-big"><?= htmlspecialchars($s['away_score']) ?></span>
+                <?php else: ?>
+                    <span class="score-num score-big">0</span>
+                    <span class="score-vs">-</span>
+                    <span class="score-num score-big">0</span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -303,17 +303,27 @@ function renderScoreItem(s) {
         + '</div>';
 }
 
+function renderBanner(scores) {
+    const el = document.getElementById('scoreBanner');
+    if (scores.length > 0) {
+        const s = scores[0];
+        el.innerHTML = '<span class="score-num score-big">' + s.home_score + '</span>'
+            + '<span class="score-vs">-</span>'
+            + '<span class="score-num score-big">' + s.away_score + '</span>';
+    } else {
+        el.innerHTML = '<span class="score-num score-big">0</span>'
+            + '<span class="score-vs">-</span>'
+            + '<span class="score-num score-big">0</span>';
+    }
+}
+
 setInterval(() => {
     fetch('api_games.php')
     .then(r => r.json())
     .then(data => {
         const scores = data.scores || [];
-        const cont = document.getElementById('scoreTicker');
-        if (scores.length === 0) {
-            cont.innerHTML = '<span class="no-scores">No live matches — check back during the tournament</span>';
-        } else {
-            cont.innerHTML = scores.map(renderScoreItem).join('');
-        }
+        document.getElementById('scoreTicker').innerHTML = scores.map(renderScoreItem).join('');
+        renderBanner(scores);
     }).catch(e => console.warn("Score poll:", e));
 }, 30000);
 </script>
