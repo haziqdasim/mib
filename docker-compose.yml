@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    container_name: mib-web
+    ports:
+      - "${PORT:-80}:80"
+    volumes:
+      # Mount the project root so live edits reflect immediately
+      - .:/var/www/html
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+    restart: unless-stopped
