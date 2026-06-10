@@ -4,26 +4,19 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 $config_file = 'active_slide.txt';
 $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) : '10.png';
 
-$games_url = 'https://worldcup26.ir/get/games';
+$games_url    = 'https://worldcup26.ir/get/games';
 $stadiums_url = 'https://worldcup26.ir/get/stadiums';
+$teams_url    = 'https://worldcup26.ir/get/teams';
 
 $city_timezone_map = [
-    'Mexico City'      => 'America/Mexico_City',
-    'Guadalajara'      => 'America/Mexico_City',
+    'Mexico City'      => 'America/Mexico_City', 'Guadalajara' => 'America/Mexico_City',
     'Monterrey'        => 'America/Monterrey',
-    'Dallas'           => 'America/Chicago',
-    'Houston'          => 'America/Chicago',
-    'Kansas City'      => 'America/Chicago',
-    'Atlanta'          => 'America/New_York',
-    'Miami'            => 'America/New_York',
-    'Boston'           => 'America/New_York',
-    'Philadelphia'     => 'America/New_York',
+    'Dallas'           => 'America/Chicago',     'Houston'     => 'America/Chicago',   'Kansas City' => 'America/Chicago',
+    'Atlanta'          => 'America/New_York',    'Miami'       => 'America/New_York',
+    'Boston'           => 'America/New_York',    'Philadelphia'=> 'America/New_York',
     'New York'         => 'America/New_York',
-    'Toronto'          => 'America/Toronto',
-    'Vancouver'        => 'America/Vancouver',
-    'Seattle'          => 'America/Los_Angeles',
-    'San Francisco'    => 'America/Los_Angeles',
-    'Los Angeles'      => 'America/Los_Angeles',
+    'Toronto'          => 'America/Toronto',     'Vancouver'   => 'America/Vancouver',
+    'Seattle'          => 'America/Los_Angeles', 'San Francisco'=> 'America/Los_Angeles', 'Los Angeles' => 'America/Los_Angeles',
 ];
 
 function fetch_json($url) {
@@ -41,13 +34,24 @@ function fetch_json($url) {
     return ($http_code === 200 && $result) ? json_decode($result, true) : null;
 }
 
+// --- Teams: build name → [fifa_code, flag] lookup ---
+$team_map = []; // name_en => [fifa_code, flag_url]
+$tdata = fetch_json($teams_url);
+if ($tdata && isset($tdata['teams'])) {
+    foreach ($tdata['teams'] as $t) {
+        $team_map[$t['name_en']] = [
+            'fifa' => $t['fifa_code'] ?? '',
+            'flag' => $t['flag'] ?? '',
+        ];
+    }
+}
+
 // --- Stadiums ---
 $stadium_timezones = [];
 $stadium_info = [];
-
-$stadium_data = fetch_json($stadiums_url);
-if ($stadium_data && isset($stadium_data['stadiums'])) {
-    foreach ($stadium_data['stadiums'] as $s) {
+$sdata = fetch_json($stadiums_url);
+if ($sdata && isset($sdata['stadiums'])) {
+    foreach ($sdata['stadiums'] as $s) {
         $sid = $s['id'];
         $city = $s['city_en'];
         $region = $s['region'] ?? '';
@@ -91,6 +95,12 @@ if (!empty($games_list)) {
         $h_score    = $game['home_score'] ?? '0';
         $a_score    = $game['away_score'] ?? '0';
 
+        // Lookup team flags
+        $h_name = $game['home_team_name_en'];
+        $a_name = $game['away_team_name_en'];
+        $h_info = $team_map[$h_name] ?? ['fifa'=>'', 'flag'=>''];
+        $a_info = $team_map[$a_name] ?? ['fifa'=>'', 'flag'=>''];
+
         $loc = '';
         if (isset($stadium_info[$stadium_id])) {
             $s = $stadium_info[$stadium_id];
@@ -99,8 +109,12 @@ if (!empty($games_list)) {
 
         $entry = [
             'stage'       => (!empty($game['group']) ? 'Group ' . $game['group'] : 'Match Stage'),
-            'home_team'   => $game['home_team_name_en'],
-            'away_team'   => $game['away_team_name_en'],
+            'home_team'   => $h_name,
+            'away_team'   => $a_name,
+            'home_fifa'   => $h_info['fifa'],
+            'away_fifa'   => $a_info['fifa'],
+            'home_flag'   => $h_info['flag'],
+            'away_flag'   => $a_info['flag'],
             'schedule'    => $formatted,
             'timestamp'   => $ts,
             'stadium'     => $loc,
@@ -110,12 +124,9 @@ if (!empty($games_list)) {
             'time_elapsed'=> $elapsed,
         ];
 
-        // Live scores: in-progress or finished games
         if ($elapsed !== 'notstarted' || $finished === 'TRUE') {
             $live_scores[] = $entry;
         }
-
-        // Upcoming sidebar: future games
         if ($elapsed === 'notstarted' && $finished === 'FALSE') {
             $upcoming_matches[] = $entry;
         }
@@ -125,16 +136,22 @@ if (!empty($games_list)) {
     $upcoming_matches = array_values(array_filter($upcoming_matches, fn($m) => $m['timestamp'] >= ($current_ts - 9000)));
     $upcoming_matches = array_slice($upcoming_matches, 0, 4);
 
-    // Sort live: in-progress first, then finished by timestamp desc
     usort($live_scores, function($a, $b) {
-        $aLive = $a['finished'] === 'TRUE' ? 1 : 0;
-        $bLive = $b['finished'] === 'TRUE' ? 1 : 0;
-        if ($aLive !== $bLive) return $aLive - $bLive;
+        $aL = $a['finished'] === 'TRUE' ? 1 : 0;
+        $bL = $b['finished'] === 'TRUE' ? 1 : 0;
+        if ($aL !== $bL) return $aL - $bL;
         return $b['timestamp'] - $a['timestamp'];
     });
 }
 
 $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
+
+// Helper: render team with flag + name
+function team_html($name, $fifa, $flag) {
+    $flag_img = $flag ? '<img src="'.htmlspecialchars($flag).'" class="team-flag" alt=""> ' : '';
+    $code = $fifa ? ' <span class="fifa-code">'.htmlspecialchars($fifa).'</span>' : '';
+    return $flag_img . htmlspecialchars($name) . $code;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -164,7 +181,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .ticker-container-cell { display: table-cell; vertical-align: middle; padding: 0 15px; }
         .ticker-flex-layout { display: flex; align-items: center; justify-content: flex-start; height: 100%; gap: 20px; }
         .ticker-label { font-weight: 700; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; color: #fff; flex-shrink: 0; }
-        .bottom-right-logo-cell { display: table-cell; width: 130px; vertical-align: middle; text-align: center; background-color: #000; }
+        .bottom-right-logo-cell { display: table-cell; width: 140px; vertical-align: middle; text-align: center; background-color: #000; }
 
         .red{ background-color: #D40101; border-radius: 10px; }
         .dark-red{ background-color: #731311; border-radius: 10px; }
@@ -176,23 +193,26 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .tz-badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 3px; padding: 0 4px; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.3px; vertical-align: middle; line-height: 1.3; }
         .stadium-location { font-size: 0.65rem; color: #6c757d; display: block; margin-top: 2px; line-height: 1.2; }
 
-        /* Ticker score items */
-        .score-item { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 1rem; font-weight: 700; color: #fff; padding: 4px 14px; border-right: 1px solid rgba(255,255,255,0.15); }
+        /* Team flag */
+        .team-flag { width: 18px; height: 12px; vertical-align: middle; border-radius: 2px; display: inline-block; object-fit: cover; }
+        .fifa-code { font-size: 0.65rem; color: #888; font-weight: 400; }
+
+        /* Score ticker items */
+        .score-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 0.95rem; font-weight: 700; color: #fff; padding: 4px 14px; border-right: 1px solid rgba(255,255,255,0.15); }
         .score-item:last-child { border-right: none; }
         .score-vs { color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0 2px; }
         .score-num { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 7px; font-family: 'Inter-Custom', monospace; font-size: 1.1rem; min-width: 24px; text-align: center; }
-        .score-big { font-size: 1.6rem; font-weight: 900; padding: 2px 10px; background: transparent; }
+        .score-big { font-size: 1.4rem; font-weight: 900; padding: 2px 8px; background: transparent; }
         .score-badge-live { background: #D40101; color: #fff; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
         .score-badge-ft { background: #333; color: #aaa; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; }
+
         /* Banner card (bottom-right) */
-        .score-banner-card {
-            background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
-            padding: 6px 8px; display: inline-block;
-        }
-        .banner-team { color: #ccc; font-size: 0.7rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
-        .banner-score { margin: 2px 0; }
+        .score-banner-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 4px 8px; display: inline-block; }
+        .banner-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .banner-team { color: #ccc; font-size: 0.65rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+        .banner-team img.team-flag { width: 14px; height: 10px; }
+        .banner-score { margin: 1px 0; }
         .ticker-scores-inner { display: flex; align-items: center; gap: 0; }
-        .no-scores { color: rgba(255,255,255,0.4); font-size: 0.9rem; font-style: italic; }
     </style>
 </head>
 
@@ -202,11 +222,8 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
     <div class="main-content-row">
         <div class="sidebar-cell">
             <div class="sidebar-header-wrapper" style="padding-bottom: 20%">
-                <a href="dashboard.php">
-                    <img src="/assets/logo-white.png" class="img-fluid" style="width:30%" alt="logo">
-                </a>
+                <a href="dashboard.php"><img src="/assets/logo-white.png" class="img-fluid" style="width:30%" alt="logo"></a>
             </div>
-
             <h5 class="text-white mt-5 mb-3">World Cup Matches</h5>
 
             <?php if (!empty($upcoming_matches)): ?>
@@ -217,8 +234,8 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
                         <div class="card-body text-dark" style="padding:10px 12px; background:#fff; border-radius:0 0 10px 10px;">
                             <div class="row g-0 align-items-center">
                                 <div class="col-md-7" style="max-width:62%;">
-                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;"><?= htmlspecialchars($m['home_team']) ?></span>
-                                    <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;"><?= htmlspecialchars($m['away_team']) ?></span>
+                                    <span class="inter fw-bold text-dark" style="display:block; font-size:0.9rem;"><?= team_html($m['home_team'], $m['home_fifa'], $m['home_flag']) ?></span>
+                                    <span class="inter fw-bold text-dark" style="display:block; font-size:0.9rem;"><?= team_html($m['away_team'], $m['away_fifa'], $m['away_flag']) ?></span>
                                     <?php if (!empty($m['stadium'])): ?><span class="stadium-location inter"><i class="bi bi-geo-alt"></i> <?= $m['stadium'] ?></span><?php endif; ?>
                                 </div>
                                 <div class="col-md-5 text-end" style="max-width:38%;">
@@ -241,37 +258,30 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
             <div class="ticker-flex-layout">
                 <div class="ticker-label">Live Score :</div>
                 <div id="scoreTicker" class="ticker-scores-inner">
-                    <?php if (!empty($live_scores)): ?>
-                        <?php foreach ($live_scores as $s): ?>
-                            <?php
-                                $badge = $s['finished'] === 'TRUE'
-                                    ? '<span class="score-badge-ft">FT</span>'
-                                    : '<span class="score-badge-live">LIVE</span>';
-                            ?>
-                            <div class="score-item">
-                                <?= $badge ?>
-                                <span><?= htmlspecialchars($s['home_team']) ?></span>
-                                <span class="score-num"><?= htmlspecialchars($s['home_score']) ?></span>
-                                <span class="score-vs">:</span>
-                                <span class="score-num"><?= htmlspecialchars($s['away_score']) ?></span>
-                                <span><?= htmlspecialchars($s['away_team']) ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                    <?php foreach ($live_scores as $s): ?>
+                        <?php $badge = $s['finished'] === 'TRUE' ? '<span class="score-badge-ft">FT</span>' : '<span class="score-badge-live">LIVE</span>'; ?>
+                        <div class="score-item">
+                            <?= $badge ?>
+                            <span><?= team_html($s['home_team'], $s['home_fifa'], $s['home_flag']) ?></span>
+                            <span class="score-num"><?= htmlspecialchars($s['home_score']) ?></span>
+                            <span class="score-vs">:</span>
+                            <span class="score-num"><?= htmlspecialchars($s['away_score']) ?></span>
+                            <span><?= team_html($s['away_team'], $s['away_fifa'], $s['away_flag']) ?></span>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </div>
         <div class="bottom-right-logo-cell">
             <div class="score-banner-card" id="scoreBanner">
-                <?php if (!empty($live_scores)): ?>
-                    <?php $s = $live_scores[0]; ?>
-                    <div class="banner-team"><?= htmlspecialchars($s['home_team']) ?></div>
-                    <div class="banner-score"><span class="score-num score-big"><?= htmlspecialchars($s['home_score']) ?></span><span class="score-vs">-</span><span class="score-num score-big"><?= htmlspecialchars($s['away_score']) ?></span></div>
-                    <div class="banner-team"><?= htmlspecialchars($s['away_team']) ?></div>
+                <?php if (!empty($live_scores)): $s = $live_scores[0]; ?>
+                    <div class="banner-row banner-team"><?= team_html($s['home_team'], $s['home_fifa'], $s['home_flag']) ?></div>
+                    <div class="banner-row banner-score"><span class="score-num score-big"><?= htmlspecialchars($s['home_score']) ?></span><span class="score-vs">-</span><span class="score-num score-big"><?= htmlspecialchars($s['away_score']) ?></span></div>
+                    <div class="banner-row banner-team"><?= team_html($s['away_team'], $s['away_fifa'], $s['away_flag']) ?></div>
                 <?php else: ?>
-                    <div class="banner-team">Home</div>
-                    <div class="banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>
-                    <div class="banner-team">Away</div>
+                    <div class="banner-row banner-team">Home</div>
+                    <div class="banner-row banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>
+                    <div class="banner-row banner-team">Away</div>
                 <?php endif; ?>
             </div>
         </div>
@@ -295,17 +305,23 @@ setInterval(() => {
 }, 4000);
 
 // Score ticker poll — updates every 30s
+function teamHtml(name, fifa, flag) {
+    const f = flag ? '<img src="' + flag + '" class="team-flag" alt=""> ' : '';
+    const c = fifa ? ' <span class="fifa-code">' + fifa + '</span>' : '';
+    return f + name + c;
+}
+
 function renderScoreItem(s) {
     const badge = s.finished === 'TRUE'
         ? '<span class="score-badge-ft">FT</span>'
         : '<span class="score-badge-live">LIVE</span>';
     return '<div class="score-item">'
         + badge
-        + '<span>' + s.home_team + '</span>'
+        + '<span>' + teamHtml(s.home_team, s.home_fifa, s.home_flag) + '</span>'
         + '<span class="score-num">' + s.home_score + '</span>'
         + '<span class="score-vs">:</span>'
         + '<span class="score-num">' + s.away_score + '</span>'
-        + '<span>' + s.away_team + '</span>'
+        + '<span>' + teamHtml(s.away_team, s.away_fifa, s.away_flag) + '</span>'
         + '</div>';
 }
 
@@ -313,13 +329,13 @@ function renderBanner(scores) {
     const el = document.getElementById('scoreBanner');
     if (scores.length > 0) {
         const s = scores[0];
-        el.innerHTML = '<div class="banner-team">' + s.home_team + '</div>'
-            + '<div class="banner-score"><span class="score-num score-big">' + s.home_score + '</span><span class="score-vs">-</span><span class="score-num score-big">' + s.away_score + '</span></div>'
-            + '<div class="banner-team">' + s.away_team + '</div>';
+        el.innerHTML = '<div class="banner-row banner-team">' + teamHtml(s.home_team, s.home_fifa, s.home_flag) + '</div>'
+            + '<div class="banner-row banner-score"><span class="score-num score-big">' + s.home_score + '</span><span class="score-vs">-</span><span class="score-num score-big">' + s.away_score + '</span></div>'
+            + '<div class="banner-row banner-team">' + teamHtml(s.away_team, s.away_fifa, s.away_flag) + '</div>';
     } else {
-        el.innerHTML = '<div class="banner-team">Home</div>'
-            + '<div class="banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>'
-            + '<div class="banner-team">Away</div>';
+        el.innerHTML = '<div class="banner-row banner-team">Home</div>'
+            + '<div class="banner-row banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>'
+            + '<div class="banner-row banner-team">Away</div>';
     }
 }
 
