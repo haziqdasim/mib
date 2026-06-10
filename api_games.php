@@ -2,115 +2,113 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-$cache_file = 'matches_cache.json';
-$cache_time = 300; // Cache duration in seconds (5 minutes)
-$remote_url = 'https://worldcup26.ir/get/games';
+$games_url = 'https://worldcup26.ir/get/games';
+$stadiums_url = 'https://worldcup26.ir/get/stadiums';
 
-// 1. Serve cache if it is fresh to save bandwidth and prevent rate-limiting
-if (file_exists($cache_file) && (time() - filemtime($cache_file) < $cache_time)) {
-    echo file_get_contents($cache_file);
-    exit;
+// City-to-timezone mapping for all 2026 WC host cities
+$city_timezone_map = [
+    'Mexico City'      => 'America/Mexico_City',
+    'Guadalajara'      => 'America/Mexico_City',
+    'Monterrey'        => 'America/Monterrey',
+    'Dallas'           => 'America/Chicago',
+    'Houston'          => 'America/Chicago',
+    'Kansas City'      => 'America/Chicago',
+    'Atlanta'          => 'America/New_York',
+    'Miami'            => 'America/New_York',
+    'Boston'           => 'America/New_York',
+    'Philadelphia'     => 'America/New_York',
+    'New York'         => 'America/New_York',
+    'Toronto'          => 'America/Toronto',
+    'Vancouver'        => 'America/Vancouver',
+    'Seattle'          => 'America/Los_Angeles',
+    'San Francisco'    => 'America/Los_Angeles',
+    'Los Angeles'      => 'America/Los_Angeles',
+];
+
+function fetch_json($url) {
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        CURLOPT_FOLLOWLOCATION => true,
+    ]);
+    $result = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return ($http_code === 200 && $result) ? json_decode($result, true) : null;
 }
 
-// 2. Fetch fresh data from the remote source
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $remote_url);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
-$json_data = curl_exec($ch);
-curl_close($ch);
+// --- Build stadium timezone map from API ---
+$stadium_timezones = [];
+$stadium_data = fetch_json($stadiums_url);
 
-if (!$json_data) {
-    // Fallback to stale cache if remote request fails
-    if (file_exists($cache_file)) {
-        echo file_get_contents($cache_file);
-    } else {
-        echo json_encode(['error' => 'Unable to fetch match data', 'games' => []]);
+if ($stadium_data && isset($stadium_data['stadiums'])) {
+    foreach ($stadium_data['stadiums'] as $s) {
+        $sid    = $s['id'];
+        $city   = $s['city_en'];
+        $region = $s['region'] ?? '';
+
+        $tz = null;
+        if (isset($city_timezone_map[$city])) {
+            $tz = $city_timezone_map[$city];
+        } else {
+            foreach ($city_timezone_map as $ck => $tv) {
+                if (stripos($city, $ck) !== false) { $tz = $tv; break; }
+            }
+        }
+        if (!$tz) {
+            $tz = match ($region) {
+                'Eastern' => 'America/New_York',
+                'Central' => 'America/Chicago',
+                'Western' => 'America/Los_Angeles',
+                default   => 'America/New_York',
+            };
+        }
+        $stadium_timezones[$sid] = $tz;
     }
-    exit;
 }
 
-$data = json_decode($json_data, true);
+// --- Fetch games ---
 $upcoming_matches = [];
 
-// Use the data structure containing games
-$games_list = isset($data['games']) ? $data['games'] : (is_array($data) ? $data : []);
+$data = fetch_json($games_url);
+$games_list = $data['games'] ?? (is_array($data) ? $data : []);
 
 if (!empty($games_list)) {
-    $malaysia_tz   = new DateTimeZone('Asia/Kuala_Lumpur');
-
-    // Map stadium ID to its respective host city/country timezone
-    $stadium_timezones = [
-        '1'  => 'America/Mexico_City',
-        '2'  => 'America/Mexico_City',
-        '3'  => 'America/Monterrey',
-        '4'  => 'America/Chicago',
-        '5'  => 'America/Chicago',
-        '6'  => 'America/Chicago',
-        '7'  => 'America/New_York',
-        '8'  => 'America/New_York',
-        '9'  => 'America/New_York',
-        '10' => 'America/New_York',
-        '11' => 'America/New_York',
-        '12' => 'America/Toronto',
-        '13' => 'America/Vancouver',
-        '14' => 'America/Los_Angeles',
-        '15' => 'America/Los_Angeles',
-        '16' => 'America/Los_Angeles'
-    ];
+    $malaysia_tz = new DateTimeZone('Asia/Kuala_Lumpur');
 
     foreach ($games_list as $game) {
-        // Only target games that have structural match names available
-        if (isset($game['home_team_name_en']) && $game['home_team_name_en'] !== null) {
-            
-            $date_str = $game['local_date']; // Format: "06/11/2026 13:00"
-            
-            $stadium_id = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
-            $tz_name = isset($stadium_timezones[$stadium_id]) ? $stadium_timezones[$stadium_id] : 'America/New_York';
-            $local_tz = new DateTimeZone($tz_name);
+        if (empty($game['home_team_name_en'])) continue;
 
-            $date = DateTime::createFromFormat('m/d/Y H:i', $date_str, $local_tz);
-            
-            if ($date) {
-                $date->setTimezone($malaysia_tz);
-                $formatted_date = $date->format('D, j M') . '<br>' . $date->format('g:ia');
-                $timestamp = $date->getTimestamp();
-            } else {
-                $formatted_date = $game['local_date'];
-                $timestamp = time();
-            }
+        $date_str   = $game['local_date'];
+        $stadium_id = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
+        $tz_name    = $stadium_timezones[$stadium_id] ?? 'America/New_York';
+        $date       = DateTime::createFromFormat('m/d/Y H:i', $date_str, new DateTimeZone($tz_name));
 
-            // Adjust fallback safely for group notation if fields vary
-            $group_label = isset($game['group']) ? 'Group ' . $game['group'] : 'Stage';
-
-            $upcoming_matches[] = [
-                'stage' => $group_label,
-                'home_team' => $game['home_team_name_en'],
-                'away_team' => $game['away_team_name_en'],
-                'schedule' => $formatted_date,
-                'timestamp' => $timestamp
-            ];
+        if ($date) {
+            $date->setTimezone($malaysia_tz);
+            $formatted = $date->format('D, j M') . ' ' . $date->format('g:ia T');
+            $ts = $date->getTimestamp();
+        } else {
+            $formatted = $date_str;
+            $ts = time();
         }
+
+        $upcoming_matches[] = [
+            'stage'     => ($game['group'] ?? false) ? 'Group ' . $game['group'] : 'Stage',
+            'home_team' => $game['home_team_name_en'],
+            'away_team' => $game['away_team_name_en'],
+            'schedule'  => $formatted,
+            'timestamp' => $ts,
+        ];
     }
 
-    // Sort chronologically
-    usort($upcoming_matches, function($a, $b) {
-        return $a['timestamp'] <=> $b['timestamp'];
-    });
-
-    // Filter logic: Exclude finished matches if timestamp is older than 2 hours ago
-    $current_time = time();
-    $upcoming_matches = array_filter($upcoming_matches, function($match) use ($current_time) {
-        return $match['timestamp'] >= ($current_time - 7200);
-    });
-
-    // Extract the top 4 matches
-    $upcoming_matches = array_slice(array_values($upcoming_matches), 0, 4);
+    usort($upcoming_matches, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    $now = time();
+    $upcoming_matches = array_values(array_filter($upcoming_matches, fn($m) => $m['timestamp'] >= ($now - 7200)));
+    $upcoming_matches = array_slice($upcoming_matches, 0, 4);
 }
 
-// 3. Save processed lightweight layout response to cache file
-$output_json = json_encode($upcoming_matches);
-file_put_contents($cache_file, $output_json);
-
-echo $output_json;
+echo json_encode($upcoming_matches);
