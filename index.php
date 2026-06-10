@@ -1,7 +1,113 @@
 <?php
-// Read the live configuration file written by the dashboard panel
+date_default_timezone_set('Asia/Kuala_Lumpur');
+
+// 1. Read the live configuration file written by the dashboard panel
 $config_file = 'active_slide.txt';
 $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) : '10.png';
+
+// 2. Fetch and Cache Live World Cup Data
+$cache_file = 'worldcup_matches_cache.json';
+$cache_time = 300; // Cache data for 5 minutes to prevent network lag on every page load
+$remote_url = 'https://worldcup26.ir/get/games';
+$json_data = null;
+
+if (file_exists($cache_file) && (time() - filemtime($cache_file) < $cache_time)) {
+    $json_data = file_get_contents($cache_file);
+} else {
+    // Fetch fresh payload from remote server via cURL
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $remote_url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+    $json_data = curl_exec($ch);
+    curl_close($ch);
+
+    if ($json_data) {
+        file_put_contents($cache_file, $json_data);
+    } elseif (file_exists($cache_file)) {
+        // Fallback to stale local cache if remote host drops
+        $json_data = file_get_contents($cache_file);
+    }
+}
+
+$data = json_decode($json_data, true);
+$upcoming_matches = [];
+
+// Parse the extracted 'games' node from the payload source
+$games_list = isset($data['games']) ? $data['games'] : (is_array($data) ? $data : []);
+
+if (!empty($games_list)) {
+    $malaysia_tz = new DateTimeZone('Asia/Kuala_Lumpur');
+    $current_timestamp = time();
+
+    // Map stadium ID to its respective host city/country timezone
+    $stadium_timezones = [
+        '1'  => 'Asia/Kuala_Lumpur',
+        '2'  => 'Asia/Kuala_Lumpur',
+        '3'  => 'Asia/Kuala_Lumpur',
+        '4'  => 'Asia/Kuala_Lumpur',
+        '5'  => 'Asia/Kuala_Lumpur',
+        '6'  => 'Asia/Kuala_Lumpur',
+        '7'  => 'Asia/Kuala_Lumpur',
+        '8'  => 'Asia/Kuala_Lumpur',
+        '9'  => 'Asia/Kuala_Lumpur',
+        '10' => 'Asia/Kuala_Lumpur',
+        '11' => 'Asia/Kuala_Lumpur',
+        '12' => 'Asia/Kuala_Lumpur',
+        '13' => 'Asia/Kuala_Lumpur',
+        '14' => 'Asia/Kuala_Lumpur',
+        '15' => 'Asia/Kuala_Lumpur',
+        '16' => 'Asia/Kuala_Lumpur'
+    ];
+
+    foreach ($games_list as $game) {
+        // Only target scheduled matches where team names are already assigned/known
+        if (isset($game['home_team_name_en']) && !empty($game['home_team_name_en'])) {
+            
+            $date_str = $game['local_date']; // Expected pattern: "06/11/2026 13:00"
+            
+            $stadium_id = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
+            $tz_name = isset($stadium_timezones[$stadium_id]) ? $stadium_timezones[$stadium_id] : 'America/New_York';
+            $local_tz = new DateTimeZone($tz_name);
+
+            $date = DateTime::createFromFormat('m/d/Y H:i', $date_str, $local_tz);
+            
+            if ($date) {
+                $date->setTimezone($malaysia_tz);
+                $formatted_date = $date->format('D, j M') . '<br>' . $date->format('g:ia');
+                $timestamp = $date->getTimestamp();
+            } else {
+                $formatted_date = $game['local_date'];
+                $timestamp = $current_timestamp;
+            }
+
+            $upcoming_matches[] = [
+                'stage' => isset($game['group']) && !empty($game['group']) ? 'Group ' . $game['group'] : 'Match Stage',
+                'home_team' => $game['home_team_name_en'],
+                'away_team' => $game['away_team_name_en'],
+                'schedule' => $formatted_date,
+                'timestamp' => $timestamp
+            ];
+        }
+    }
+
+    // Sort all games chronologically from earliest to latest
+    usort($upcoming_matches, function($a, $b) {
+        return $a['timestamp'] <=> $b['timestamp'];
+    });
+
+    // Filtering: Remove matches that completed more than 2.5 hours ago to preserve live visual status
+    $upcoming_matches = array_filter($upcoming_matches, function($match) use ($current_timestamp) {
+        return $match['timestamp'] >= ($current_timestamp - 9000);
+    });
+
+    // Keep exactly the top 4 upcoming records
+    $upcoming_matches = array_slice(array_values($upcoming_matches), 0, 4);
+}
+
+// Visual color style mapping cycle for your sidebar cards
+$card_styles = ['dark-red', 'red', 'green', 'dark-green'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -22,7 +128,6 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             font-style: normal;
         }
 
-        /* Registered your new Inter TTF font profile here */
         @font-face {
             font-family: 'Inter-Custom';
             src: url('/assets/fonts/Inter_18pt-Regular.ttf') format('truetype');
@@ -48,12 +153,10 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             font-family: 'FWC2026-NormalRegular', sans-serif;
         }
 
-        /* Explicitly forced the .inter class selection rule to render with the new local file font asset */
         .inter { 
             font-family: 'Inter-Custom', sans-serif !important; 
         }
 
-        /* Layout Framework Layout */
         .tv-container {
             height: 100vh;
             display: table;
@@ -66,7 +169,6 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             height: 88vh;
         }
 
-        /* Left Sidebar Panel using table-cell for clean TV layout */
         .sidebar-cell {
             display: table-cell;
             width: 16%;
@@ -83,15 +185,7 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             text-align: center;
             margin-bottom: 25px;
         }
-
-        .brand-logo-img {
-            max-width: 75px;
-            height: auto;
-            position: relative;
-            z-index: 2;
-        }
         
-        /* Carousel Content Cell */
         .carousel-cell {
             display: table-cell;
             width: 84%;
@@ -103,11 +197,10 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             background-size: cover;
             background-repeat: no-repeat;
             box-shadow: 
-            inset 4px 4px 30px rgba(0, 0, 0, 0.5), 
-            inset -4px -4px 30px rgba(0, 0, 0, 0.5);
+            inset 4px 4px 30px rgba(0, 0, 0, 0.1), 
+            inset -4px -4px 30px rgba(0, 0, 0, 0.1);
         }
 
-        /* Bottom Live Score Ticker Layout */
         .ticker-row {
             display: table-row;
             height: 12vh;
@@ -140,54 +233,12 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             color: #ffffff;
         }
 
-        .ticker-items-wrapper {
-            flex-grow: 1;
-            display: flex;
-            gap: 15px;
-            overflow: hidden;
-        }
-
-        .ticker-card {
-            background-color: #ffffff;
-            color: #000000;
-            border-radius: 12px;
-            padding: 10px 18px;
-            min-width: 240px;
-            flex-shrink: 0;
-            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
-        }
-
-        .ticker-team-text {
-            font-weight: 500;
-            font-size: 0.82rem;
-        }
-
-        .ticker-score-box {
-            font-weight: 700;
-            font-size: 1.05rem;
-            padding: 0 12px;
-            text-align: center;
-        }
-
-        .ticker-details-box {
-            border-left: 1px solid #dee2e6;
-            padding-left: 12px;
-            font-size: 0.68rem;
-            color: #6c757d;
-            line-height: 1.3;
-        }
-
         .bottom-right-logo-cell {
             display: table-cell;
             width: 70px;
             vertical-align: middle;
             text-align: center;
             background-color: #000000;
-        }
-
-        .mini-logo-img {
-            max-height: 48px;
-            width: auto;
         }
 
         .red{ background-color: #D40101; border-radius: 10px; }
@@ -202,9 +253,7 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
 <body>
 
     <div class="tv-container">
-
         <div class="main-content-row">
-
             <div class="sidebar-cell">
                 <div class="sidebar-header-wrapper" style="padding-bottom: 20%">
                     <a href="dashboard.php">
@@ -212,72 +261,41 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                     </a>
                 </div>
 
-                <h5 class="text-white mt-5">World Cup Matches</h5>
+                <h5 class="text-white mt-5 mb-3">World Cup Matches</h5>
                 
-                <div class="card mb-3" style="border-radius: 10px;">
-                    <div class="card-header text-white inter fw-bold dark-red" id="stage">Group Stage</div>
-                    <div class="card-body text-dark">
-                        <div class="row">
-                            <div class="col-md-7">
-                                <span class="inter" id="country">Mexico</span><br>
-                                <span class="inter" id="country">South Africa</span>
+                <?php if (!empty($upcoming_matches)): ?>
+                    <?php foreach ($upcoming_matches as $index => $match): ?>
+                        <?php $style = $card_styles[$index % count($card_styles)]; ?>
+                        <div class="card mb-3" style="border-radius: 10px;">
+                            <div class="card-header text-white inter fw-bold <?php echo $style; ?>">
+                                <?php echo htmlspecialchars($match['stage']); ?>
                             </div>
-                            <div class="col-md-5">
-                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-3" style="border-radius: 10px;">
-                    <div class="card-header text-white inter fw-bold red">Group Stage</div>
-                    <div class="card-body text-dark">
-                    <div class="row">
-                            <div class="col-md-7">
-                                <span class="inter" id="country">Mexico</span><br>
-                                <span class="inter" id="country">South Africa</span>
-                            </div>
-                            <div class="col-md-5">
-                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
+                            <div class="card-body text-dark" style="padding: 10px 12px; background-color: #ffffff; border-radius: 0 0 10px 10px;">
+                                <div class="row g-0 align-items-center">
+                                    <div class="col-md-7" style="max-width: 62%;">
+                                        <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
+                                            <?php echo htmlspecialchars($match['home_team']); ?>
+                                        </span>
+                                        <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
+                                            <?php echo htmlspecialchars($match['away_team']); ?>
+                                        </span>
+                                    </div>
+                                    <div class="col-md-5 text-end" style="max-width: 38%;">
+                                        <span class="inter text-secondary fw-bold" style="line-height: 1.2; display: block; font-size: 0.78rem;">
+                                            <?php echo $match['schedule']; ?>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="card mb-3" style="border-radius: 10px;">
-                    <div class="card-header text-white inter fw-bold green">Group Stage</div>
-                    <div class="card-body text-dark">
-                    <div class="row">
-                            <div class="col-md-7">
-                                <span class="inter" id="country">Mexico</span><br>
-                                <span class="inter" id="country">South Africa</span>
-                            </div>
-                            <div class="col-md-5">
-                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-3" style="border-radius: 10px;">
-                    <div class="card-header text-white inter fw-bold dark-green">Group Stage</div>
-                    <div class="card-body text-dark">
-                    <div class="row">
-                            <div class="col-md-7">
-                                <span class="inter" id="country">Mexico</span><br>
-                                <span class="inter" id="country">South Africa</span>
-                            </div>
-                            <div class="col-md-5">
-                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="text-white-50 inter" style="font-size:0.8rem;">No matches scheduled.</p>
+                <?php endif; ?>
             </div>
 
             <div class="carousel-cell" style="background-image: url('assets/slide/<?php echo htmlspecialchars($live_image); ?>');">
             </div>
-
         </div>
 
         <div class="ticker-row">
@@ -290,74 +308,16 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
 
             <div class="bottom-right-logo-cell">
                 <div class="d-flex bd-highlight mb-3">
-                    
                     <div class="p-2 bd-highlight">
                         <div class="card">
                             <div class="d-flex bd-highlight">
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/mexico.png" alt="flag">
-                                    <span class="text-dark inter">Mexico</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter fw-bold">1 V 1</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/southafrica.png" alt="flag">
-                                    <span class="text-dark inter">S. Africa</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
-                                </div>
+                                <span class="text-dark px-2 py-2">Coming Soon</span>
                             </div>
                         </div>
                     </div>
-
-                    <div class="p-2 bd-highlight">
-                        <div class="card">
-                            <div class="d-flex bd-highlight">
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/mexico.png" alt="flag">
-                                    <span class="text-dark inter">Mexico</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter fw-bold">1 V 1</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/southafrica.png" alt="flag">
-                                    <span class="text-dark inter">S. Africa</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="p-2 bd-highlight">
-                        <div class="card">
-                            <div class="d-flex bd-highlight">
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/mexico.png" alt="flag">
-                                    <span class="text-dark inter">Mexico</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter fw-bold">1 V 1</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <img src="assets/flag/southafrica.png" alt="flag">
-                                    <span class="text-dark inter">S. Africa</span>
-                                </div>
-                                <div class="p-2 flex-fill bd-highlight">
-                                    <span class="text-dark inter"><b>Group Stage</b> | Fri, 12 Jun, 3:00am</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                 </div>
             </div>
         </div>
-
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
@@ -365,6 +325,7 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
         crossorigin="anonymous"></script>
         
     <script>
+        // Check structural image modification differences dynamically without killing device performance
         setInterval(() => {
             fetch(window.location.href)
             .then(response => response.text())
@@ -372,10 +333,12 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const newBg = doc.querySelector('.carousel-cell').style.backgroundImage;
-                document.querySelector('.carousel-cell').style.backgroundImage = newBg;
-            });
-        }, 3000); // Polls system updates safely every 3 seconds
+                const activeContainer = document.querySelector('.carousel-cell');
+                if(activeContainer.style.backgroundImage !== newBg) {
+                    activeContainer.style.backgroundImage = newBg;
+                }
+            }).catch(err => console.warn("Polling slide failure:", err));
+        }, 4000);
     </script>
 </body>
-
 </html>
