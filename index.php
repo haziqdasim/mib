@@ -5,6 +5,7 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 $config_file = 'active_slide.txt';
 $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) : '10.png';
 
+<<<<<<< HEAD
 // 2. Fetch Live World Cup Data — no cache
 $games_url = 'https://worldcup26.ir/get/games';
 $stadiums_url = 'https://worldcup26.ir/get/stadiums';
@@ -31,6 +32,22 @@ $city_timezone_map = [
 
 // Helper: fetch JSON from URL
 function fetch_json($url) {
+=======
+// 2. Fetch and Cache Live World Cup Data
+$cache_file = 'worldcup_matches_cache.json';
+$stadium_cache_file = 'stadiums_cache.json';
+$cache_time = 300; // Cache data for 5 minutes
+$stadium_cache_time = 3600; // Stadium data changes rarely - cache 1 hour
+
+$remote_url = 'https://worldcup26.ir/get/games';
+$stadium_url = 'https://worldcup26.ir/get/stadiums';
+$json_data = null;
+
+// --- Fetch games ---
+if (file_exists($cache_file) && (time() - filemtime($cache_file) < $cache_time)) {
+    $json_data = file_get_contents($cache_file);
+} else {
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
@@ -45,6 +62,7 @@ function fetch_json($url) {
     return ($http_code === 200 && $result) ? json_decode($result, true) : null;
 }
 
+<<<<<<< HEAD
 // --- Fetch stadiums and build timezone map ---
 $stadium_timezones = [];
 $stadium_info = []; // stadium_id => [name, city, country]
@@ -107,6 +125,157 @@ if (!empty($games_list)) {
         } else {
             $formatted = $date_str;
             $ts = $current_ts;
+=======
+    if ($json_data) {
+        file_put_contents($cache_file, $json_data);
+    } elseif (file_exists($cache_file)) {
+        $json_data = file_get_contents($cache_file);
+    }
+}
+
+// --- Fetch stadiums and build timezone map ---
+$stadium_timezones = [];
+$stadium_info = []; // stadium_id => [name, city, country]
+
+// City-to-timezone mapping for all 2026 WC host cities
+$city_timezone_map = [
+    // Mexico
+    'Mexico City'      => 'America/Mexico_City',
+    'Guadalajara'      => 'America/Mexico_City',
+    'Monterrey'        => 'America/Monterrey',
+    // USA - Central
+    'Dallas'           => 'America/Chicago',
+    'Houston'          => 'America/Chicago',
+    'Kansas City'      => 'America/Chicago',
+    // USA - Eastern
+    'Atlanta'          => 'America/New_York',
+    'Miami'            => 'America/New_York',
+    'Boston'           => 'America/New_York',
+    'Philadelphia'     => 'America/New_York',
+    'New York'         => 'America/New_York',
+    // Canada
+    'Toronto'          => 'America/Toronto',
+    'Vancouver'        => 'America/Vancouver',
+    // USA - Western
+    'Seattle'          => 'America/Los_Angeles',
+    'San Francisco'    => 'America/Los_Angeles',
+    'Los Angeles'      => 'America/Los_Angeles',
+];
+
+// Try to fetch stadiums from API
+$stadiums_json = null;
+if (file_exists($stadium_cache_file) && (time() - filemtime($stadium_cache_file) < $stadium_cache_time)) {
+    $stadiums_json = file_get_contents($stadium_cache_file);
+} else {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $stadium_url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+    $stadiums_json = curl_exec($ch);
+    curl_close($ch);
+
+    if ($stadiums_json) {
+        file_put_contents($stadium_cache_file, $stadiums_json);
+    } elseif (file_exists($stadium_cache_file)) {
+        $stadiums_json = file_get_contents($stadium_cache_file);
+    }
+}
+
+// Parse stadium data and build timezone map
+if ($stadiums_json) {
+    $stadium_data = json_decode($stadiums_json, true);
+    $stadium_list = isset($stadium_data['stadiums']) ? $stadium_data['stadiums'] : [];
+
+    foreach ($stadium_list as $s) {
+        $sid = $s['id'];
+        $city = $s['city_en'];
+        $country = $s['country_en'];
+
+        // Store stadium info for display
+        $stadium_info[$sid] = [
+            'name' => $s['name_en'],
+            'city' => $city,
+            'country' => $country,
+        ];
+
+        // Resolve timezone from city name
+        $tz = null;
+        // Try exact city match first
+        if (isset($city_timezone_map[$city])) {
+            $tz = $city_timezone_map[$city];
+        } else {
+            // Try fuzzy match: check if any map key appears in the city string
+            foreach ($city_timezone_map as $city_key => $tz_val) {
+                if (stripos($city, $city_key) !== false) {
+                    $tz = $tz_val;
+                    break;
+                }
+            }
+        }
+
+        // Fallback by region
+        if (!$tz) {
+            $region = $s['region'] ?? '';
+            $tz = match ($region) {
+                'Eastern'  => 'America/New_York',
+                'Central'  => 'America/Chicago',
+                'Western'  => 'America/Los_Angeles',
+                default    => 'America/New_York',
+            };
+        }
+
+        $stadium_timezones[$sid] = $tz;
+    }
+}
+
+$data = json_decode($json_data, true);
+$upcoming_matches = [];
+
+$games_list = isset($data['games']) ? $data['games'] : (is_array($data) ? $data : []);
+
+if (!empty($games_list)) {
+    $malaysia_tz = new DateTimeZone('Asia/Kuala_Lumpur');
+    $current_timestamp = time();
+
+    foreach ($games_list as $game) {
+        if (isset($game['home_team_name_en']) && !empty($game['home_team_name_en'])) {
+
+            $date_str = $game['local_date']; // Format: "06/11/2026 13:00"
+
+            $stadium_id = isset($game['stadium_id']) ? (string)$game['stadium_id'] : '';
+            $tz_name = isset($stadium_timezones[$stadium_id])
+                ? $stadium_timezones[$stadium_id]
+                : 'America/New_York';
+            $local_tz = new DateTimeZone($tz_name);
+
+            $date = DateTime::createFromFormat('m/d/Y H:i', $date_str, $local_tz);
+
+            if ($date) {
+                $date->setTimezone($malaysia_tz);
+                $formatted_date = $date->format('D, j M') . '<br>' . $date->format('g:ia') . ' <span class="tz-badge">MYT</span>';
+                $timestamp = $date->getTimestamp();
+            } else {
+                $formatted_date = $game['local_date'];
+                $timestamp = $current_timestamp;
+            }
+
+            // Stadium display info
+            $stadium_display = '';
+            if (isset($stadium_info[$stadium_id])) {
+                $s = $stadium_info[$stadium_id];
+                $stadium_display = htmlspecialchars($s['city']) . ', ' . htmlspecialchars($s['country']);
+            }
+
+            $upcoming_matches[] = [
+                'stage' => isset($game['group']) && !empty($game['group']) ? 'Group ' . $game['group'] : 'Match Stage',
+                'home_team' => $game['home_team_name_en'],
+                'away_team' => $game['away_team_name_en'],
+                'schedule' => $formatted_date,
+                'timestamp' => $timestamp,
+                'stadium' => $stadium_display,
+            ];
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
         }
 
         $loc = '';
@@ -125,9 +294,24 @@ if (!empty($games_list)) {
         ];
     }
 
+<<<<<<< HEAD
     usort($upcoming_matches, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
     $upcoming_matches = array_values(array_filter($upcoming_matches, fn($m) => $m['timestamp'] >= ($current_ts - 9000)));
     $upcoming_matches = array_slice($upcoming_matches, 0, 4);
+=======
+    // Sort chronologically
+    usort($upcoming_matches, function($a, $b) {
+        return $a['timestamp'] <=> $b['timestamp'];
+    });
+
+    // Filter out matches completed more than 2.5 hours ago
+    $upcoming_matches = array_filter($upcoming_matches, function($match) use ($current_timestamp) {
+        return $match['timestamp'] >= ($current_timestamp - 9000);
+    });
+
+    // Keep top 4
+    $upcoming_matches = array_slice(array_values($upcoming_matches), 0, 4);
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
 }
 
 $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
@@ -199,6 +383,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .card{ border: none; }
         .card-header:first-child{ border-radius: 9px 9px 0 0; }
 
+<<<<<<< HEAD
         .tz-badge {
             display: inline-block;
             background: rgba(255,255,255,0.15);
@@ -208,6 +393,30 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
             vertical-align: middle; line-height: 1.3;
         }
         .stadium-location { font-size: 0.65rem; color: #6c757d; display: block; margin-top: 2px; line-height: 1.2; }
+=======
+        /* MYT timezone badge */
+        .tz-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            padding: 0 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            vertical-align: middle;
+            line-height: 1.3;
+        }
+
+        /* Stadium location text */
+        .stadium-location {
+            font-size: 0.65rem;
+            color: #6c757d;
+            display: block;
+            margin-top: 2px;
+            line-height: 1.2;
+        }
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
     </style>
 </head>
 
@@ -222,6 +431,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
                 </a>
             </div>
 
+<<<<<<< HEAD
             <h5 class="text-white mt-5 mb-3">World Cup Matches</h5>
 
             <?php if (!empty($upcoming_matches)): ?>
@@ -248,6 +458,37 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
                                     <span class="inter text-secondary fw-bold" style="line-height:1.2; display:block; font-size:0.78rem;">
                                         <?= $m['schedule'] ?>
                                     </span>
+=======
+                <h5 class="text-white mt-5 mb-3">World Cup Matches</h5>
+                
+                <?php if (!empty($upcoming_matches)): ?>
+                    <?php foreach ($upcoming_matches as $index => $match): ?>
+                        <?php $style = $card_styles[$index % count($card_styles)]; ?>
+                        <div class="card mb-3" style="border-radius: 10px;">
+                            <div class="card-header text-white inter fw-bold <?php echo $style; ?>">
+                                <?php echo htmlspecialchars($match['stage']); ?>
+                            </div>
+                            <div class="card-body text-dark" style="padding: 10px 12px; background-color: #ffffff; border-radius: 0 0 10px 10px;">
+                                <div class="row g-0 align-items-center">
+                                    <div class="col-md-7" style="max-width: 62%;">
+                                        <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
+                                            <?php echo htmlspecialchars($match['home_team']); ?>
+                                        </span>
+                                        <span class="inter fw-bold text-dark" style="display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:0.9rem;">
+                                            <?php echo htmlspecialchars($match['away_team']); ?>
+                                        </span>
+                                        <?php if (!empty($match['stadium'])): ?>
+                                            <span class="stadium-location inter">
+                                                <i class="bi bi-geo-alt"></i> <?php echo $match['stadium']; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-md-5 text-end" style="max-width: 38%;">
+                                        <span class="inter text-secondary fw-bold" style="line-height: 1.2; display: block; font-size: 0.78rem;">
+                                            <?php echo $match['schedule']; ?>
+                                        </span>
+                                    </div>
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
                                 </div>
                             </div>
                         </div>
@@ -283,6 +524,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
     </div>
 </div>
 
+<<<<<<< HEAD
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
     crossorigin="anonymous"></script>
@@ -298,5 +540,26 @@ setInterval(() => {
     }).catch(e => console.warn("Polling failed:", e));
 }, 4000);
 </script>
+=======
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+        crossorigin="anonymous"></script>
+        
+    <script>
+        setInterval(() => {
+            fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newBg = doc.querySelector('.carousel-cell').style.backgroundImage;
+                const activeContainer = document.querySelector('.carousel-cell');
+                if(activeContainer.style.backgroundImage !== newBg) {
+                    activeContainer.style.backgroundImage = newBg;
+                }
+            }).catch(err => console.warn("Polling slide failure:", err));
+        }, 4000);
+    </script>
+>>>>>>> 6ea361b9a41707233084cb0608f768c1a0432082
 </body>
 </html>
