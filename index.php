@@ -112,6 +112,7 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
             display: table-row;
             height: 12vh;
             background-image: url(assets/bg-sidebar2.png);
+            background-repeat: no-repeat;
             background-size: contain;
             background-position: left;
         }
@@ -214,15 +215,15 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                 <h5 class="text-white mt-5">World Cup Matches</h5>
                 
                 <div class="card mb-3" style="border-radius: 10px;">
-                    <div class="card-header text-white inter fw-bold dark-red">Group Stage</div>
+                    <div class="card-header text-white inter fw-bold dark-red" id="stage">Group Stage</div>
                     <div class="card-body text-dark">
                         <div class="row">
                             <div class="col-md-7">
-                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                                <span class="inter" id="country">Mexico</span><br>
+                                <span class="inter" id="country">South Africa</span>
                             </div>
                             <div class="col-md-5">
-                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
+                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
@@ -231,13 +232,13 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                 <div class="card mb-3" style="border-radius: 10px;">
                     <div class="card-header text-white inter fw-bold red">Group Stage</div>
                     <div class="card-body text-dark">
-                        <div class="row">
+                    <div class="row">
                             <div class="col-md-7">
-                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                                <span class="inter" id="country">Mexico</span><br>
+                                <span class="inter" id="country">South Africa</span>
                             </div>
                             <div class="col-md-5">
-                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
+                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
@@ -246,13 +247,13 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                 <div class="card mb-3" style="border-radius: 10px;">
                     <div class="card-header text-white inter fw-bold green">Group Stage</div>
                     <div class="card-body text-dark">
-                        <div class="row">
+                    <div class="row">
                             <div class="col-md-7">
-                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                                <span class="inter" id="country">Mexico</span><br>
+                                <span class="inter" id="country">South Africa</span>
                             </div>
                             <div class="col-md-5">
-                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
+                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
@@ -261,13 +262,13 @@ $live_image = file_exists($config_file) ? trim(file_get_contents($config_file)) 
                 <div class="card mb-3" style="border-radius: 10px;">
                     <div class="card-header text-white inter fw-bold dark-green">Group Stage</div>
                     <div class="card-body text-dark">
-                        <div class="row">
+                    <div class="row">
                             <div class="col-md-7">
-                                <img src="/assets/flag/mexico.png" alt="flag"> <span class="inter">Mexico</span><br>
-                                <img src="/assets/flag/southafrica.png" alt="flag"> <span class="inter">South Africa</span>
+                                <span class="inter" id="country">Mexico</span><br>
+                                <span class="inter" id="country">South Africa</span>
                             </div>
                             <div class="col-md-5">
-                                <span class="inter">Fri, 12 Jun<br>3:00am</span>
+                                <span class="inter" id="matchDetails">Fri, 12 Jun<br>3:00am</span>
                             </div>
                         </div>
                     </div>
