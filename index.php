@@ -164,7 +164,7 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .ticker-container-cell { display: table-cell; vertical-align: middle; padding: 0 15px; }
         .ticker-flex-layout { display: flex; align-items: center; justify-content: flex-start; height: 100%; gap: 20px; }
         .ticker-label { font-weight: 700; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; color: #fff; flex-shrink: 0; }
-        .bottom-right-logo-cell { display: table-cell; width: 110px; vertical-align: middle; text-align: center; background-color: #000; }
+        .bottom-right-logo-cell { display: table-cell; width: 130px; vertical-align: middle; text-align: center; background-color: #000; }
 
         .red{ background-color: #D40101; border-radius: 10px; }
         .dark-red{ background-color: #731311; border-radius: 10px; }
@@ -184,7 +184,13 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
         .score-big { font-size: 1.6rem; font-weight: 900; padding: 2px 10px; background: transparent; }
         .score-badge-live { background: #D40101; color: #fff; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
         .score-badge-ft { background: #333; color: #aaa; font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: 800; }
-        .ticker-scores-wrap { overflow: hidden; flex: 1; }
+        /* Banner card (bottom-right) */
+        .score-banner-card {
+            background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
+            padding: 6px 8px; display: inline-block;
+        }
+        .banner-team { color: #ccc; font-size: 0.7rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+        .banner-score { margin: 2px 0; }
         .ticker-scores-inner { display: flex; align-items: center; gap: 0; }
         .no-scores { color: rgba(255,255,255,0.4); font-size: 0.9rem; font-style: italic; }
     </style>
@@ -256,16 +262,16 @@ $card_styles = ['dark-red', 'red', 'green', 'dark-green'];
             </div>
         </div>
         <div class="bottom-right-logo-cell">
-            <div class="score-item" id="scoreBanner">
+            <div class="score-banner-card" id="scoreBanner">
                 <?php if (!empty($live_scores)): ?>
                     <?php $s = $live_scores[0]; ?>
-                    <span class="score-num score-big"><?= htmlspecialchars($s['home_score']) ?></span>
-                    <span class="score-vs">-</span>
-                    <span class="score-num score-big"><?= htmlspecialchars($s['away_score']) ?></span>
+                    <div class="banner-team"><?= htmlspecialchars($s['home_team']) ?></div>
+                    <div class="banner-score"><span class="score-num score-big"><?= htmlspecialchars($s['home_score']) ?></span><span class="score-vs">-</span><span class="score-num score-big"><?= htmlspecialchars($s['away_score']) ?></span></div>
+                    <div class="banner-team"><?= htmlspecialchars($s['away_team']) ?></div>
                 <?php else: ?>
-                    <span class="score-num score-big">0</span>
-                    <span class="score-vs">-</span>
-                    <span class="score-num score-big">0</span>
+                    <div class="banner-team">Home</div>
+                    <div class="banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>
+                    <div class="banner-team">Away</div>
                 <?php endif; ?>
             </div>
         </div>
@@ -307,13 +313,13 @@ function renderBanner(scores) {
     const el = document.getElementById('scoreBanner');
     if (scores.length > 0) {
         const s = scores[0];
-        el.innerHTML = '<span class="score-num score-big">' + s.home_score + '</span>'
-            + '<span class="score-vs">-</span>'
-            + '<span class="score-num score-big">' + s.away_score + '</span>';
+        el.innerHTML = '<div class="banner-team">' + s.home_team + '</div>'
+            + '<div class="banner-score"><span class="score-num score-big">' + s.home_score + '</span><span class="score-vs">-</span><span class="score-num score-big">' + s.away_score + '</span></div>'
+            + '<div class="banner-team">' + s.away_team + '</div>';
     } else {
-        el.innerHTML = '<span class="score-num score-big">0</span>'
-            + '<span class="score-vs">-</span>'
-            + '<span class="score-num score-big">0</span>';
+        el.innerHTML = '<div class="banner-team">Home</div>'
+            + '<div class="banner-score"><span class="score-num score-big">0</span><span class="score-vs">-</span><span class="score-num score-big">0</span></div>'
+            + '<div class="banner-team">Away</div>';
     }
 }
 
